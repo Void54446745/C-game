@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NUCLEAR DEFENDER — Last Stand</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --amber: #ffb300;
+  --red: #ff1744;
+  --green: #00e676;
+  --cyan: #00e5ff;
+  --bg: #050810;
+  --dim: rgba(255,179,0,0.07);
+}
+
+body {
+  background: var(--bg);
+  font-family: 'Share Tech Mono', monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 100% 50% at 50% 100%, rgba(255,100,0,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 30% at 50% 0%, rgba(0,229,255,0.05) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+#wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+h1 {
+  font-family: 'Black Ops One', cursive;
+  font-size: clamp(18px, 3.5vw, 30px);
+  letter-spacing: 0.2em;
+  color: var(--amber);
+  text-shadow: 0 0 20px rgba(255,179,0,0.5), 0 0 60px rgba(255,100,0,0.2);
+  text-align: center;
+}
+
+.tagline {
+  font-size: 10px;
+  letter-spacing: 0.4em;
+  color: #334;
+  text-transform: uppercase;
+  margin-top: -6px;
+}
+
+#hud {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+}
+
+.stat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.stat-label { font-size: 9px; letter-spacing: 0.25em; color: #445; }
+.stat-val { font-size: 19px; color: var(--amber); }
+.stat-val.r { color: var(--red); }
+.stat-val.g { color: var(--green); }
+.stat-val.c { color: var(--cyan); }
+
+#canvas-wrap {
+  position: relative;
+  border: 1px solid #1a2035;
+  box-shadow: 0 0 40px rgba(255,100,0,0.12), inset 0 0 80px rgba(0,0,0,0.6);
+}
+
+canvas { display: block; }
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(3,5,12,0.93);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  backdrop-filter: blur(3px);
+}
+#overlay.hidden { display: none; }
+
+.ov-title {
+  font-family: 'Black Ops One', cursive;
+  font-size: clamp(24px, 5vw, 44px);
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+.ov-title.amber { color: var(--amber); text-shadow: 0 0 30px rgba(255,179,0,0.6); }
+.ov-title.red { color: var(--red); text-shadow: 0 0 30px rgba(255,23,68,0.6); }
+.ov-title.green { color: var(--green); text-shadow: 0 0 30px rgba(0,230,118,0.6); }
+
+.ov-sub {
+  font-size: 11px;
+  color: #445;
+  letter-spacing: 0.2em;
+  line-height: 2;
+  text-align: center;
+}
+
+.btn {
+  padding: 10px 36px;
+  font-family: 'Black Ops One', cursive;
+  font-size: 13px;
+  letter-spacing: 0.15em;
+  background: transparent;
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+}
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--amber);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s;
+  z-index: -1;
+}
+.btn:hover { color: #000; }
+.btn:hover::before { transform: scaleX(1); }
+
+/* City HP bars */
+#city-bars {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.city-hp-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.city-label { font-size: 8px; color: #334; letter-spacing: 0.1em; }
+.city-hp { width: 36px; height: 6px; background: #111; border: 1px solid #223; }
+.city-hp-fill { height: 100%; background: var(--green); transition: width 0.3s, background 0.3s; }
+
+#ammo-bar-wrap {
+  display: flex; align-items: center; gap: 8px;
+}
+.ammo-label { font-size: 9px; letter-spacing: 0.2em; color: #445; }
+#ammo-bar { width: 120px; height: 6px; background: #111; border: 1px solid #223; }
+#ammo-fill { height: 100%; background: var(--cyan); transition: width 0.2s; }
+
+#hint {
+  font-size: 9px;
+  color: #223;
+  letter-spacing: 0.2em;
+  text-align: center;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+#scanline {
+  position: fixed;
+  left: 0; right: 0;
+  height: 2px;
+  background: rgba(0,229,255,0.04);
+  pointer-events: none;
+  animation: scanline 6s linear infinite;
+  z-index: 10;
+}
+
+/* Wave announcement */
+#wave-announce {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Black Ops One', cursive;
+  font-size: 28px;
+  color: var(--red);
+  text-shadow: 0 0 30px rgba(255,23,68,0.8);
+  letter-spacing: 0.2em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+#wave-announce.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="scanline"></div>
+<div id="wrap">
+  <header>
+    <h1>☢ NUCLEAR DEFENDER</h1>
+    <p class="tagline">Last Stand Protocol — Eyes On Target</p>
+  </header>
+
+  <div id="hud">
+    <div class="stat"><span class="stat-label">Score</span><span class="stat-val" id="score">0</span></div>
+    <div class="stat"><span class="stat-label">Wave</span><span class="stat-val c" id="wave">1</span></div>
+    <div class="stat"><span class="stat-label">Intercepted</span><span class="stat-val g" id="intercepted">0</span></div>
+    <div class="stat"><span class="stat-label">Hi-Score</span><span class="stat-val" id="hi">0</span></div>
+  </div>
+
+  <div id="ammo-bar-wrap">
+    <span class="ammo-label">AMMO</span>
+    <div id="ammo-bar"><div id="ammo-fill"></div></div>
+    <span class="stat-val c" id="ammo-count" style="font-size:13px">30</span>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div id="wave-announce"></div>
+
+    <div id="overlay">
+      <div class="ov-title amber" id="ov-title">NUCLEAR DEFENDER</div>
+      <div class="ov-sub" id="ov-sub">
+        CLICK TO LAUNCH INTERCEPTOR MISSILES<br>
+        DESTROY WARHEADS BEFORE THEY HIT YOUR CITIES<br>
+        YOUR INTERCEPTORS EXPLODE IN A RADIUS — AIM AHEAD<br><br>
+        3 CITIES · SURVIVE 10 WAVES TO WIN
+      </div>
+      <button class="btn" id="ov-btn">LAUNCH DEFENSE</button>
+    </div>
+  </div>
+
+  <div id="city-bars">
+    <span style="font-size:9px;color:#334;letter-spacing:0.15em;">CITIES:</span>
+    <div class="city-hp-wrap"><div class="city-label">ALPHA</div><div class="city-hp"><div class="city-hp-fill" id="city0-hp"></div></div></div>
+    <div class="city-hp-wrap"><div class="city-label">BRAVO</div><div class="city-hp"><div class="city-hp-fill" id="city1-hp"></div></div></div>
+    <div class="city-hp-wrap"><div class="city-label">DELTA</div><div class="city-hp"><div class="city-hp-fill" id="city2-hp"></div></div></div>
+  </div>
+
+  <p id="hint">CLICK ANYWHERE TO INTERCEPT · LEAD YOUR TARGET</p>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = 560, H = 420;
+canvas.width = W; canvas.height = H;
+
+// ── CITIES ──────────────────────────────────────────────────────────────────
+const CITY_Y = H - 28;
+const CITIES = [
+  { x: 100, hp: 3, maxHp: 3, alive: true },
+  { x: W/2, hp: 3, maxHp: 3, alive: true },
+  { x: W - 100, hp: 3, maxHp: 3, alive: true }
+];
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let missiles = [], interceptors = [], explosions = [], particles = [], stars = [];
+let score = 0, wave = 1, intercepted = 0, hiScore = 0;
+let ammo = 30, maxAmmo = 30;
+let running = false, waveActive = false;
+let spawnTimer = 0, spawnInterval = 90;
+let missilesThisWave = 0, missilesPerWave = 6;
+let waveComplete = false;
+let mouseX = W/2, mouseY = H/2;
+let tick = 0;
+let animId;
+
+// ── STARS ────────────────────────────────────────────────────────────────────
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 80; i++) {
+    stars.push({ x: Math.random()*W, y: Math.random()*(H*0.75), b: Math.random() });
+  }
+}
+
+// ── INIT WAVE ────────────────────────────────────────────────────────────────
+function initWave(w) {
+  missiles = []; interceptors = []; explosions = []; particles = [];
+  missilesThisWave = 0;
+  missilesPerWave = 5 + w * 2;
+  spawnInterval = Math.max(30, 90 - w * 8);
+  spawnTimer = 0;
+  waveActive = true;
+  waveComplete = false;
+  ammo = Math.min(maxAmmo, 20 + w * 2);
+  updateAmmoBar();
+  showWaveAnnounce('WAVE ' + w);
+}
+
+function showWaveAnnounce(text) {
+  const el = document.getElementById('wave-announce');
+  el.textContent = text;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+// ── SPAWN MISSILE ────────────────────────────────────────────────────────────
+function spawnMissile() {
+  const alive = CITIES.filter(c => c.alive);
+  if (!alive.length) return;
+  const target = alive[Math.floor(Math.random() * alive.length)];
+  const sx = Math.random() * W;
+  const speed = 0.6 + Math.random() * 0.5 + wave * 0.08;
+  const dx = target.x - sx, dy = CITY_Y - 0;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  missiles.push({
+    x: sx, y: 0,
+    vx: (dx/dist)*speed, vy: (dy/dist)*speed,
+    tx: target.x, ty: CITY_Y,
+    trail: [], type: wave >= 6 ? 'fast' : 'normal',
+    dead: false
+  });
+  if (wave >= 5 && Math.random() < 0.3) {
+    // Cluster: spawn two more offset
+    [-30, 30].forEach(off => {
+      const t2 = alive[Math.floor(Math.random() * alive.length)];
+      const dx2 = t2.x + off - sx, dy2 = CITY_Y - 0;
+      const d2 = Math.sqrt(dx2*dx2 + dy2*dy2);
+      missiles.push({ x: sx+off, y: -20, vx: (dx2/d2)*speed*0.9, vy: (dy2/d2)*speed*0.9, tx: t2.x, ty: CITY_Y, trail: [], type: 'normal', dead: false });
+    });
+    missilesThisWave += 2;
+  }
+  missilesThisWave++;
+}
+
+// ── INTERCEPT CLICK ──────────────────────────────────────────────────────────
+canvas.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  mouseX = e.clientX - r.left;
+  mouseY = e.clientY - r.top;
+});
+
+canvas.addEventListener('click', e => {
+  if (!running || !waveActive) return;
+  if (ammo <= 0) return;
+  const r = canvas.getBoundingClientRect();
+  const tx = e.clientX - r.left, ty = e.clientY - r.top;
+  // Launch from defense base (bottom center)
+  const bx = W/2, by = H - 10;
+  const dx = tx - bx, dy = ty - by;
+  const dist = Math.sqrt(dx*dx+dy*dy)||1;
+  const spd = 6;
+  interceptors.push({ x: bx, y: by, vx: (dx/dist)*spd, vy: (dy/dist)*spd, tx, ty, trail: [], dead: false });
+  ammo--;
+  updateAmmoBar();
+});
+
+// ── EXPLOSION ────────────────────────────────────────────────────────────────
+function createExplosion(x, y, r, color, fromPlayer) {
+  explosions.push({ x, y, r: 0, maxR: r, life: 1, color, fromPlayer });
+  spawnParticles(x, y, color, 10, r);
+}
+
+function spawnParticles(x, y, color, n, spread) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random()*Math.PI*2;
+    const s = 1 + Math.random()*spread/20;
+    particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 1, decay: 0.025+Math.random()*0.03, color, size: 2+Math.random()*2 });
+  }
+}
+
+// ── UPDATE ────────────────────────────────────────────────────────────────────
+function update() {
+  tick++;
+
+  // Spawn
+  if (waveActive && missilesThisWave < missilesPerWave) {
+    spawnTimer++;
+    if (spawnTimer >= spawnInterval) {
+      spawnTimer = 0;
+      spawnMissile();
+    }
+  }
+
+  // Move missiles
+  for (let i = missiles.length-1; i >= 0; i--) {
+    const m = missiles[i];
+    if (m.dead) { missiles.splice(i,1); continue; }
+    m.trail.push({x: m.x, y: m.y});
+    if (m.trail.length > 18) m.trail.shift();
+    m.x += m.vx; m.y += m.vy;
+
+    // Hit city
+    if (m.y >= CITY_Y - 5) {
+      const hit = CITIES.find(c => c.alive && Math.abs(c.x - m.x) < 28);
+      if (hit) {
+        hit.hp--;
+        createExplosion(m.x, CITY_Y, 40, '#ff4400', false);
+        if (hit.hp <= 0) { hit.hp = 0; hit.alive = false; }
+        updateCityBars();
+      } else {
+        createExplosion(m.x, CITY_Y - 10, 25, '#ff6600', false);
+      }
+      m.dead = true;
+      // Check game over
+      if (CITIES.every(c => !c.alive)) { triggerGameOver(); return; }
+    }
+  }
+
+  // Move interceptors
+  for (let i = interceptors.length-1; i >= 0; i--) {
+    const p = interceptors[i];
+    if (p.dead) { interceptors.splice(i,1); continue; }
+    p.trail.push({x: p.x, y: p.y});
+    if (p.trail.length > 12) p.trail.shift();
+    p.x += p.vx; p.y += p.vy;
+
+    const dx = p.x - p.tx, dy = p.y - p.ty;
+    if (Math.sqrt(dx*dx+dy*dy) < 8 || p.y < 0) {
+      createExplosion(p.x, p.y, 45 + wave*3, '#00e5ff', true);
+      p.dead = true;
+    }
+  }
+
+  // Explosions vs missiles
+  for (const ex of explosions) {
+    if (!ex.fromPlayer) continue;
+    for (const m of missiles) {
+      if (m.dead) continue;
+      const dx = m.x - ex.x, dy = m.y - ex.y;
+      if (Math.sqrt(dx*dx+dy*dy) < ex.maxR * ex.life + 6) {
+        m.dead = true;
+        intercepted++;
+        score += wave * 100;
+        createExplosion(m.x, m.y, 30, '#ffb300', false);
+        document.getElementById('intercepted').textContent = intercepted;
+        document.getElementById('score').textContent = score;
+      }
+    }
+  }
+
+  // Update explosions
+  for (let i = explosions.length-1; i >= 0; i--) {
+    const e = explosions[i];
+    e.r += (e.maxR - e.r) * 0.18;
+    e.life -= 0.04;
+    if (e.life <= 0) explosions.splice(i,1);
+  }
+
+  // Update particles
+  for (let i = particles.length-1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.06;
+    p.life -= p.decay;
+    if (p.life <= 0) particles.splice(i,1);
+  }
+
+  // Wave complete?
+  if (waveActive && missilesThisWave >= missilesPerWave && missiles.length === 0 && interceptors.length === 0 && explosions.length === 0) {
+    waveActive = false;
+    score += wave * 500;
+    document.getElementById('score').textContent = score;
+    if (wave >= 10) { triggerWin(); return; }
+    // Ammo reload bonus
+    ammo = Math.min(maxAmmo, ammo + 5);
+    updateAmmoBar();
+    setTimeout(() => {
+      wave++;
+      document.getElementById('wave').textContent = wave;
+      initWave(wave);
+    }, 2000);
+    showWaveAnnounce('WAVE CLEAR +500');
+  }
+}
+
+// ── DRAW ──────────────────────────────────────────────────────────────────────
+function draw() {
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#02040d');
+  sky.addColorStop(0.7, '#060a16');
+  sky.addColorStop(1, '#0a0604');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars
+  for (const s of stars) {
+    const b = s.b * (0.5 + 0.5 * Math.sin(tick * 0.02 + s.b * 10));
+    ctx.fillStyle = `rgba(180,200,255,${b})`;
+    ctx.fillRect(s.x, s.y, 1, 1);
+  }
+
+  // Horizon glow
+  const hg = ctx.createLinearGradient(0, H-60, 0, H);
+  hg.addColorStop(0, 'rgba(255,80,0,0)');
+  hg.addColorStop(1, 'rgba(255,60,0,0.18)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, H-60, W, 60);
+
+  // Ground
+  ctx.fillStyle = '#0d0a08';
+  ctx.fillRect(0, CITY_Y + 12, W, H - CITY_Y - 12);
+  ctx.strokeStyle = '#1a1208';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, CITY_Y+12); ctx.lineTo(W, CITY_Y+12); ctx.stroke();
+
+  // Draw missiles
+  for (const m of missiles) {
+    if (m.dead) continue;
+    // Trail
+    for (let t = 0; t < m.trail.length; t++) {
+      const alpha = (t / m.trail.length) * 0.5;
+      ctx.strokeStyle = `rgba(255,60,0,${alpha})`;
+      ctx.lineWidth = 1.5;
+      if (t > 0) {
+        ctx.beginPath();
+        ctx.moveTo(m.trail[t-1].x, m.trail[t-1].y);
+        ctx.lineTo(m.trail[t].x, m.trail[t].y);
+        ctx.stroke();
+      }
+    }
+    // Missile body
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(Math.atan2(m.vy, m.vx) + Math.PI/2);
+    ctx.fillStyle = '#cc2200';
+    ctx.fillRect(-3, -8, 6, 10);
+    ctx.fillStyle = '#ff4400';
+    ctx.beginPath();
+    ctx.moveTo(-3, -8); ctx.lineTo(0, -14); ctx.lineTo(3, -8);
+    ctx.fill();
+    // Exhaust
+    ctx.fillStyle = `rgba(255,${120+Math.floor(Math.random()*80)},0,0.8)`;
+    ctx.beginPath();
+    ctx.arc(0, 5, 3+Math.random()*2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Interceptors
+  for (const p of interceptors) {
+    if (p.dead) continue;
+    for (let t = 1; t < p.trail.length; t++) {
+      ctx.strokeStyle = `rgba(0,229,255,${(t/p.trail.length)*0.6})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(p.trail[t-1].x, p.trail[t-1].y);
+      ctx.lineTo(p.trail[t].x, p.trail[t].y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#00e5ff';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+    ctx.fill();
+    // Target reticle
+    ctx.strokeStyle = 'rgba(0,229,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(p.tx, p.ty, 10, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.tx-14, p.ty); ctx.lineTo(p.tx+14, p.ty); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p.tx, p.ty-14); ctx.lineTo(p.tx, p.ty+14); ctx.stroke();
+  }
+
+  // Explosions
+  for (const e of explosions) {
+    ctx.save();
+    ctx.globalAlpha = e.life * 0.35;
+    const g = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r);
+    g.addColorStop(0, e.fromPlayer ? 'rgba(0,229,255,0.9)' : 'rgba(255,100,0,0.9)');
+    g.addColorStop(0.5, e.fromPlayer ? 'rgba(0,150,255,0.4)' : 'rgba(255,50,0,0.3)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = e.life * 0.8;
+    ctx.strokeStyle = e.fromPlayer ? '#00e5ff' : '#ff6600';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // Cities
+  for (let i = 0; i < CITIES.length; i++) {
+    const c = CITIES[i];
+    drawCity(c.x, CITY_Y, c.alive, c.hp / c.maxHp);
+  }
+
+  // Defense base
+  drawBase(W/2, H - 10);
+
+  // Cursor crosshair
+  if (running && waveActive) {
+    ctx.strokeStyle = 'rgba(0,229,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(mouseX - 12, mouseY); ctx.lineTo(mouseX + 12, mouseY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mouseX, mouseY - 12); ctx.lineTo(mouseX, mouseY + 12); ctx.stroke();
+    ctx.beginPath(); ctx.arc(mouseX, mouseY, 6, 0, Math.PI*2); ctx.stroke();
+  }
+
+  // Ammo 0 warning
+  if (ammo === 0 && running) {
+    ctx.fillStyle = `rgba(255,23,68,${0.5 + 0.5*Math.sin(tick*0.15)})`;
+    ctx.font = 'bold 11px Share Tech Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠ NO AMMO — WAIT FOR RELOAD', W/2, 20);
+  }
+}
+
+function drawCity(x, y, alive, hpFrac) {
+  ctx.save();
+  if (!alive) {
+    // Rubble
+    ctx.fillStyle = '#1a0a00';
+    ctx.fillRect(x - 20, y - 8, 40, 8);
+    ctx.fillStyle = '#2a1200';
+    for (let i = 0; i < 5; i++) ctx.fillRect(x - 18 + i*8, y - 4 - Math.sin(i)*4, 5, 4);
+    // Fire
+    ctx.fillStyle = `rgba(255,80,0,${0.3+0.2*Math.sin(tick*0.1+x)})`;
+    ctx.beginPath(); ctx.arc(x, y - 8, 6, 0, Math.PI*2); ctx.fill();
+  } else {
+    const col = hpFrac > 0.6 ? '#00bb55' : hpFrac > 0.3 ? '#ffaa00' : '#ff3300';
+    ctx.fillStyle = col;
+    // Buildings
+    ctx.fillRect(x - 20, y - 18, 8, 18);
+    ctx.fillRect(x - 9, y - 26, 10, 26);
+    ctx.fillRect(x + 4, y - 20, 7, 20);
+    ctx.fillRect(x + 14, y - 14, 8, 14);
+    // Windows
+    ctx.fillStyle = `rgba(255,240,100,${0.6+0.3*Math.sin(tick*0.05+x)})`;
+    ctx.fillRect(x - 18, y - 14, 3, 3);
+    ctx.fillRect(x - 7, y - 20, 3, 3);
+    ctx.fillRect(x - 7, y - 12, 3, 3);
+    ctx.fillRect(x + 6, y - 14, 3, 3);
+    // HP bar
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(x - 16, y - 32, 32, 4);
+    ctx.fillStyle = col;
+    ctx.fillRect(x - 16, y - 32, 32 * hpFrac, 4);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+function drawBase(x, y) {
+  ctx.fillStyle = '#00aacc';
+  ctx.fillRect(x - 18, y - 8, 36, 8);
+  ctx.fillStyle = '#007799';
+  ctx.fillRect(x - 10, y - 14, 20, 6);
+  ctx.fillStyle = '#00e5ff';
+  ctx.fillRect(x - 4, y - 20, 8, 6);
+  // Antenna
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(x, y - 20); ctx.lineTo(x, y - 28); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y - 28, 3, 0, Math.PI*2); ctx.stroke();
+  // Pulse ring
+  const pr = 6 + 4*Math.sin(tick*0.1);
+  ctx.strokeStyle = `rgba(0,229,255,${0.3+0.2*Math.sin(tick*0.1)})`;
+  ctx.beginPath(); ctx.arc(x, y - 28, pr, 0, Math.PI*2); ctx.stroke();
+}
+
+// ── HUD UPDATES ───────────────────────────────────────────────────────────────
+function updateCityBars() {
+  CITIES.forEach((c, i) => {
+    const fill = document.getElementById(`city${i}-hp`);
+    fill.style.width = (c.hp / c.maxHp * 100) + '%';
+    fill.style.background = c.hp > 2 ? '#00e676' : c.hp > 1 ? '#ffb300' : '#ff1744';
+  });
+}
+
+function updateAmmoBar() {
+  document.getElementById('ammo-fill').style.width = (ammo / maxAmmo * 100) + '%';
+  document.getElementById('ammo-count').textContent = ammo;
+}
+
+// ── GAME LOOP ────────────────────────────────────────────────────────────────
+function loop() {
+  if (running) update();
+  draw();
+  animId = requestAnimationFrame(loop);
+}
+
+// ── GAME OVER / WIN ──────────────────────────────────────────────────────────
+function triggerGameOver() {
+  running = false;
+  if (score > hiScore) { hiScore = score; document.getElementById('hi').textContent = hiScore; }
+  setTimeout(() => showOverlay('CITIES DESTROYED', `WAVE ${wave} · SCORE ${score}\nINTERCEPTED: ${intercepted} WARHEADS`, 'red', 'RETRY', startGame), 1000);
+}
+
+function triggerWin() {
+  running = false;
+  if (score > hiScore) { hiScore = score; document.getElementById('hi').textContent = hiScore; }
+  showOverlay('NATION SAVED', `ALL 10 WAVES SURVIVED\nFINAL SCORE: ${score}`, 'green', 'PLAY AGAIN', startGame);
+}
+
+// ── OVERLAY ──────────────────────────────────────────────────────────────────
+function showOverlay(title, sub, cls, btnText, cb) {
+  const el = document.getElementById('overlay');
+  el.classList.remove('hidden');
+  document.getElementById('ov-title').textContent = title;
+  document.getElementById('ov-title').className = 'ov-title ' + cls;
+  document.getElementById('ov-sub').textContent = sub;
+  const btn = document.getElementById('ov-btn');
+  btn.textContent = btnText;
+  btn.onclick = cb;
+}
+
+// ── START ────────────────────────────────────────────────────────────────────
+function startGame() {
+  document.getElementById('overlay').classList.add('hidden');
+  CITIES.forEach(c => { c.hp = c.maxHp; c.alive = true; });
+  score = 0; wave = 1; intercepted = 0; ammo = 30;
+  missiles = []; interceptors = []; explosions = []; particles = [];
+  document.getElementById('score').textContent = 0;
+  document.getElementById('wave').textContent = 1;
+  document.getElementById('intercepted').textContent = 0;
+  updateCityBars();
+  updateAmmoBar();
+  running = true;
+  initWave(1);
+}
+
+document.getElementById('ov-btn').onclick = startGame;
+initStars();
+loop();
+</script>
+</body>
+</html>
