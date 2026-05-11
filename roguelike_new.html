@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>☢ Nuclear Wasteland — Roguelike</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bungee&family=VT323&display=swap');
+:root{--green:#39ff14;--acid:#aaff00;--orange:#ff8c00;--red:#ff2222;--dark:#080c08;--panel:#0d160d;--border:#1a4a1a;--text:#c8ffc8;--dim:#4a7a4a;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--dark);color:var(--text);font-family:'VT323',monospace;font-size:18px;overflow:hidden;width:100vw;height:100vh;display:flex;flex-direction:column;}
+canvas{display:block;image-rendering:pixelated;}
+#hud{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:16px;padding:6px 14px;background:linear-gradient(180deg,#000c00cc,transparent);z-index:20;pointer-events:none;}
+.hud-label{font-size:13px;color:var(--dim);font-family:'VT323',monospace;}
+.hud-val{font-size:22px;color:var(--green);text-shadow:0 0 8px var(--green);}
+#hpBar{width:160px;height:14px;background:#0a1a0a;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+#hpFill{height:100%;background:linear-gradient(90deg,#ff2222,#ff6600);transition:width .15s;border-radius:3px;}
+#xpBar{width:120px;height:8px;background:#0a1a0a;border:1px solid var(--border);border-radius:3px;overflow:hidden;}
+#xpFill{height:100%;background:linear-gradient(90deg,var(--green),var(--acid));transition:width .3s;border-radius:3px;}
+.hud-sep{color:var(--border);}
+#weaponBar{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:20;pointer-events:none;}
+.wslot{width:60px;height:60px;border:2px solid var(--border);border-radius:8px;background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:26px;position:relative;}
+.wslot.active{border-color:var(--green);box-shadow:0 0 14px var(--green)55;}
+.wslot .wkey{position:absolute;top:2px;left:5px;font-size:11px;color:var(--dim);}
+.wslot .wammo{position:absolute;bottom:2px;right:4px;font-size:11px;color:var(--acid);}
+#mutPanel{position:fixed;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;z-index:20;pointer-events:none;}
+.mut{width:44px;height:44px;border:1px solid var(--border);border-radius:6px;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:22px;position:relative;}
+.mut.glow{border-color:var(--green);box-shadow:0 0 10px var(--green)44;}
+.mut .mtip{display:none;position:absolute;right:52px;top:50%;transform:translateY(-50%);background:#0d200d;border:1px solid var(--green);border-radius:6px;padding:4px 10px;white-space:nowrap;font-size:15px;color:var(--text);pointer-events:none;}
+.mut:hover .mtip{display:block;}
+.overlay{position:fixed;inset:0;z-index:100;background:#000c;display:flex;align-items:center;justify-content:center;}
+.box{background:var(--panel);border:2px solid var(--green);border-radius:16px;padding:32px 40px;max-width:560px;width:92%;text-align:center;box-shadow:0 0 60px #39ff1433;}
+.box h1{font-family:'Bungee',sans-serif;font-size:38px;color:var(--green);text-shadow:0 0 24px var(--green);margin-bottom:6px;}
+.box h2{font-family:'Bungee',sans-serif;font-size:22px;color:var(--acid);margin-bottom:14px;}
+.box p{color:var(--dim);font-size:17px;line-height:1.6;margin-bottom:14px;}
+.box .controls{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;text-align:left;margin-bottom:18px;font-size:16px;}
+.box .controls span{color:var(--green);}
+button.gbtn{padding:12px 30px;margin:6px;border:2px solid var(--green);border-radius:8px;background:transparent;color:var(--green);font-family:'Bungee',sans-serif;font-size:16px;cursor:pointer;transition:all .2s;}
+button.gbtn:hover{background:#39ff1420;box-shadow:0 0 20px #39ff1466;}
+button.gbtn.red{border-color:var(--red);color:var(--red);}
+button.gbtn.red:hover{background:#ff222220;}
+button.gbtn.orange{border-color:var(--orange);color:var(--orange);}
+button.gbtn.orange:hover{background:#ff8c0020;}
+#levelUpOverlay{display:none;}
+#levelUpOverlay .box h1{color:#ffff00;text-shadow:0 0 24px #ffff00;font-size:30px;margin-bottom:18px;}
+#perkGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px;}
+.perkCard{border:2px solid var(--border);border-radius:10px;background:#0a180a;padding:14px 10px;cursor:pointer;transition:all .2s;text-align:center;}
+.perkCard:hover{border-color:var(--acid);background:#0f200f;box-shadow:0 0 16px var(--acid)44;}
+.perkCard .picon{font-size:34px;display:block;margin-bottom:6px;}
+.perkCard .pname{font-family:'Bungee',sans-serif;font-size:13px;color:var(--green);margin-bottom:4px;}
+.perkCard .pdesc{font-size:14px;color:var(--dim);line-height:1.3;}
+#roomFlash{position:fixed;inset:0;z-index:15;pointer-events:none;background:radial-gradient(circle,#39ff1420 0%,transparent 70%);opacity:0;transition:opacity .4s;}
+#roomLabel{position:fixed;top:50px;left:50%;transform:translateX(-50%);font-family:'Bungee',sans-serif;font-size:28px;color:var(--acid);text-shadow:0 0 20px var(--acid);pointer-events:none;z-index:25;opacity:0;transition:opacity .3s;}
+.dmgNum{position:fixed;pointer-events:none;z-index:30;font-family:'Bungee',sans-serif;font-size:20px;color:#ff4444;text-shadow:0 0 8px #ff4444;animation:floatUp 1s forwards;}
+.dmgNum.crit{color:#ffff00;font-size:26px;text-shadow:0 0 12px #ffff00;}
+.dmgNum.heal{color:var(--green);}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-60px)}}
+#minimap{position:fixed;top:52px;right:10px;width:120px;height:120px;background:#060d06;border:1px solid var(--border);border-radius:6px;z-index:20;pointer-events:none;overflow:hidden;}
+#minimapCanvas{width:100%;height:100%;image-rendering:pixelated;}
+#log{position:fixed;left:10px;bottom:80px;width:240px;max-height:120px;overflow:hidden;z-index:20;pointer-events:none;display:flex;flex-direction:column;justify-content:flex-end;}
+.logLine{font-size:14px;color:var(--dim);animation:fadeLog 4s forwards;}
+.logLine.imp{color:var(--acid);}
+@keyframes fadeLog{0%{opacity:1}80%{opacity:1}100%{opacity:0}}
+#roomProgress{position:fixed;top:46px;left:50%;transform:translateX(-50%);font-family:'Bungee',sans-serif;font-size:13px;color:var(--dim);z-index:20;pointer-events:none;letter-spacing:0.1em;}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div><div class="hud-label">SURVIVOR</div><div class="hud-val" id="hudName">☢ UNKNOWN</div></div>
+  <div class="hud-sep">│</div>
+  <div><div class="hud-label">HP</div><div id="hpBar"><div id="hpFill" style="width:100%"></div></div><div class="hud-val" id="hudHp">60/60</div></div>
+  <div class="hud-sep">│</div>
+  <div><div class="hud-label">LVL</div><div class="hud-val" id="hudLvl">1</div><div id="xpBar"><div id="xpFill" style="width:0%"></div></div></div>
+  <div class="hud-sep">│</div>
+  <div><div class="hud-label">FLOOR</div><div class="hud-val" id="hudFloor">1</div></div>
+  <div class="hud-sep">│</div>
+  <div><div class="hud-label">ROOM</div><div class="hud-val" id="hudRoom">1</div></div>
+  <div class="hud-sep">│</div>
+  <div><div class="hud-label">KILLS</div><div class="hud-val" id="hudKills">0</div></div>
+  <div class="hud-sep">│</div>
+  <div><div class="hud-label">SCORE</div><div class="hud-val" id="hudScore">0</div></div>
+</div>
+<div id="roomProgress"></div>
+<div id="mutPanel"></div>
+<div id="minimap"><canvas id="minimapCanvas" width="120" height="120"></canvas></div>
+<div id="roomFlash"></div>
+<div id="roomLabel"></div>
+<div id="log"></div>
+<div id="weaponBar">
+  <div class="wslot active" id="ws0"><span class="wkey">1</span><span id="wi0">🔫</span><span class="wammo" id="wa0">∞</span></div>
+  <div class="wslot" id="ws1"><span class="wkey">2</span><span id="wi1">—</span><span class="wammo" id="wa1"></span></div>
+  <div class="wslot" id="ws2"><span class="wkey">3</span><span id="wi2">—</span><span class="wammo" id="wa2"></span></div>
+  <div class="wslot" id="ws3"><span class="wkey">4</span><span id="wi3">—</span><span class="wammo" id="wa3"></span></div>
+</div>
+<canvas id="gameCanvas"></canvas>
+
+<!-- Start Screen -->
+<div class="overlay" id="startOverlay">
+  <div class="box">
+    <h1>☢ NUCLEAR WASTELAND</h1>
+    <h2>Endless Roguelike</h2>
+    <p>The wasteland is infinite. Every floor gets worse. You will not escape — only delay the inevitable.</p>
+    <div class="controls">
+      <div><span>WASD / Arrows</span> — Move</div>
+      <div><span>Mouse Aim + LMB</span> — Shoot</div>
+      <div><span>RMB</span> — Dodge roll</div>
+      <div><span>1–4</span> — Switch weapon</div>
+      <div><span>R</span> — Reload</div>
+      <div><span>N</span> — Next room (cleared)</div>
+    </div>
+    <button class="gbtn" onclick="startGame()">☢ BEGIN SURVIVAL</button>
+  </div>
+</div>
+
+<!-- Level Up -->
+<div class="overlay" id="levelUpOverlay">
+  <div class="box">
+    <h1>⚡ MUTATION AVAILABLE</h1>
+    <div id="perkGrid"></div>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div class="overlay" id="gameOverOverlay" style="display:none">
+  <div class="box">
+    <h1 style="color:var(--red);text-shadow:0 0 24px var(--red)">☠ YOU DIED</h1>
+    <h2 id="goSubtitle">Consumed by the Wasteland</h2>
+    <p id="goStats"></p>
+    <button class="gbtn" onclick="startGame()">☢ TRY AGAIN</button>
+    <button class="gbtn red" onclick="showStart()">↩ MAIN MENU</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  NUCLEAR WASTELAND — INFINITE ROGUELIKE
+//  - Sequential rooms, boss always last per floor
+//  - Player & weapons heavily nerfed
+//  - Enemies buffed per floor
+//  - Minion has limited bullets (acts like a companion)
+// ═══════════════════════════════════════════════════
+
+const canvas = document.getElementById('gameCanvas');
+const ctx    = canvas.getContext('2d');
+function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+resize(); window.addEventListener('resize',resize);
+
+function saveHS(s){ const p=parseInt(localStorage.getItem('nw2_hs')||'0'); if(s>p)localStorage.setItem('nw2_hs',s); }
+function getHS(){ return parseInt(localStorage.getItem('nw2_hs')||'0'); }
+
+const TILE=48;
+const keys={}, mouse={x:0,y:0,down:false};
+let shootHeld=false;
+
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='KeyR'&&G.running) reload();
+  if(e.code==='Digit1') switchWeapon(0);
+  if(e.code==='Digit2') switchWeapon(1);
+  if(e.code==='Digit3') switchWeapon(2);
+  if(e.code==='Digit4') switchWeapon(3);
+  if(e.code==='KeyN'&&G.running&&G.roomCleared) advanceRoom();
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+});
+document.addEventListener('keyup',e=>{ keys[e.code]=false; });
+canvas.addEventListener('mousemove',e=>{ mouse.x=e.clientX; mouse.y=e.clientY; });
+canvas.addEventListener('mousedown',e=>{ if(e.button===0){mouse.down=true;shootHeld=true;} if(e.button===2){mouse.right=true;dodgeRoll();} });
+canvas.addEventListener('mouseup',e=>{ if(e.button===0){mouse.down=false;shootHeld=false;} if(e.button===2)mouse.right=false; });
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+// ── Weapons (nerfed: lower dmg, slower fire, less ammo) ───────────────────
+const WEAPONS=[
+  {name:'Scrap Pistol',   icon:'🔫',dmg:7,  spd:700, ammo:Infinity,maxAmmo:Infinity,reload:0,   spread:0.10,bullets:1,projSpd:8, color:'#ffff00',auto:false,desc:'Slow, weak sidearm'},
+  {name:'Pipe SMG',       icon:'🔧',dmg:4,  spd:220, ammo:24,      maxAmmo:24,      reload:2200,spread:0.25,bullets:1,projSpd:9, color:'#00ff88',auto:true, desc:'Fast but weak'},
+  {name:'Rusty Shotgun',  icon:'💣',dmg:6,  spd:1100,ammo:8,       maxAmmo:8,       reload:2800,spread:0.55,bullets:5,projSpd:7, color:'#aaff00',auto:false,desc:'Short range spread'},
+  {name:'Nuke Flask',     icon:'☢', dmg:30, spd:2000,ammo:3,       maxAmmo:3,       reload:3500,spread:0,   bullets:1,projSpd:4, color:'#ff8800',auto:false,desc:'Slow AoE bomb'},
+  {name:'Laser Pointer',  icon:'⚡',dmg:12, spd:1000,ammo:15,      maxAmmo:15,      reload:2500,spread:0.03,bullets:1,projSpd:13,color:'#00ccff',auto:false,desc:'Piercing beam'},
+  {name:'Pipe Minigun',   icon:'🌀',dmg:3,  spd:140, ammo:80,      maxAmmo:80,      reload:3500,spread:0.35,bullets:1,projSpd:10,color:'#ff4444',auto:true, desc:'High volume, low dmg'},
+];
+
+// ── Perks ─────────────────────────────────────────
+const ALL_PERKS=[
+  {id:'hp_up',     icon:'❤', name:'Rad Flesh',      desc:'+20 Max HP',             apply:p=>{p.maxHp+=20;p.hp=Math.min(p.hp+20,p.maxHp);}},
+  {id:'spd_up',    icon:'💨',name:'Mutant Legs',     desc:'+15% move speed',        apply:p=>{p.speed*=1.15;}},
+  {id:'dmg_up',    icon:'☠', name:'Feral Strength',  desc:'+20% damage',            apply:p=>{p.dmgMult*=1.20;}},
+  {id:'fire_up',   icon:'🔥',name:'Adrenaline',      desc:'+15% fire rate',         apply:p=>{p.fireMult*=0.85;}},
+  {id:'regen',     icon:'🌿',name:'Rad Regen',       desc:'Regen 0.5 HP/sec',       apply:p=>{p.regen+=0.5;}},
+  {id:'shield',    icon:'🛡', name:'Bone Armor',      desc:'+8 armor',               apply:p=>{p.armor+=8;}},
+  {id:'crit',      icon:'💥',name:'Glass Cannon',    desc:'+10% crit chance',       apply:p=>{p.crit+=0.10;}},
+  {id:'lifesteal', icon:'🩸',name:'Vampiric',        desc:'4% lifesteal on hit',    apply:p=>{p.lifesteal+=0.04;}},
+  {id:'dodge_up',  icon:'🌀',name:'Phantom Step',    desc:'+1 dodge charge',        apply:p=>{p.maxDodge+=1;p.dodges=p.maxDodge;}},
+  {id:'explosive', icon:'💣',name:'Volatile Body',   desc:'Enemies explode on kill',apply:p=>{p.explodeKill=true;}},
+  {id:'multishot', icon:'🎯',name:'Split Atom',      desc:'+1 bullet per shot',     apply:p=>{p.extraBullets+=1;}},
+  {id:'xp_up',     icon:'⭐',name:'Quick Learner',   desc:'+20% XP gain',           apply:p=>{p.xpMult*=1.20;}},
+  {id:'healKill',  icon:'💊',name:'Cannibal',        desc:'Heal 3 HP per kill',     apply:p=>{p.healOnKill+=3;}},
+  {id:'smg_now',   icon:'🔧',name:'Pipe SMG',        desc:'Unlock Pipe SMG',        apply:p=>{unlockWeapon(1);}},
+  {id:'shot_now',  icon:'💣',name:'Rusty Shotgun',   desc:'Unlock Rusty Shotgun',   apply:p=>{unlockWeapon(2);}},
+  {id:'laser_now', icon:'⚡',name:'Laser Pointer',   desc:'Unlock Laser Pointer',   apply:p=>{unlockWeapon(4);}},
+  {id:'mini_now',  icon:'🌀',name:'Pipe Minigun',    desc:'Unlock Minigun',         apply:p=>{unlockWeapon(5);}},
+  {id:'nuke_now',  icon:'☢', name:'Nuke Flask',      desc:'Unlock Nuke Flask',      apply:p=>{unlockWeapon(3);}},
+  {id:'minion',    icon:'🤖',name:'Scrap Minion',    desc:'Summon 1 companion bot', apply:p=>{spawnMinion();}},
+];
+
+// ── Enemy Types (harder than original) ────────────────────────────────────
+const ENEMY_TYPES=[
+  {name:'Rad Ghoul',      color:'#558855',hp:50,  spd:1.7, dmg:10, xp:10, score:10,  size:18,icon:'👾'},
+  {name:'Mutant Hound',   color:'#885533',hp:35,  spd:2.8, dmg:16, xp:12, score:15,  size:14,icon:'🐕'},
+  {name:'Toxic Crawler',  color:'#aacc00',hp:28,  spd:2.2, dmg:8,  xp:8,  score:8,   size:12,icon:'🦂'},
+  {name:'Rad Soldier',    color:'#446644',hp:100, spd:1.4, dmg:18, xp:20, score:25,  size:20,icon:'🧟',shoots:true},
+  {name:'Scrap Bot',      color:'#aaaaaa',hp:140, spd:1.2, dmg:24, xp:25, score:30,  size:22,icon:'🤖',shoots:true},
+  {name:'Mutant Brute',   color:'#cc4422',hp:220, spd:1.0, dmg:35, xp:40, score:50,  size:28,icon:'👹'},
+  {name:'Poison Spitter', color:'#66cc00',hp:80,  spd:1.6, dmg:12, xp:18, score:20,  size:16,icon:'🐸',shoots:true,burstShoot:true},
+  {name:'Ghost Raider',   color:'#aaaacc',hp:60,  spd:3.0, dmg:22, xp:22, score:28,  size:16,icon:'👻'},
+  {name:'Rad Sniper',     color:'#226622',hp:70,  spd:0.8, dmg:30, xp:28, score:35,  size:18,icon:'🎯',shoots:true,sniper:true},
+  // Bosses
+  {name:'Rad Tank',       color:'#cc8800',hp:600, spd:0.7, dmg:45, xp:80, score:150, size:38,icon:'🚂',boss:true,shoots:true},
+  {name:'Nuke Witch',     color:'#ff00cc',hp:450, spd:1.8, dmg:28, xp:90, score:180, size:30,icon:'🧙',boss:true,shoots:true,burstShoot:true},
+  {name:'Mutant Overlord',color:'#ff4400',hp:900, spd:1.1, dmg:55, xp:150,score:300, size:44,icon:'👺',boss:true,shoots:true},
+  {name:'Wasteland Wyrm', color:'#008800',hp:750, spd:2.0, dmg:40, xp:130,score:250, size:40,icon:'🐉',boss:true},
+  {name:'Nuclear Titan',  color:'#ff0000',hp:1400,spd:0.9, dmg:70, xp:200,score:500, size:50,icon:'💀',boss:true,shoots:true,burstShoot:true},
+];
+
+// ── Room sequence per floor ────────────────────────
+// Rooms in order: combat, combat, [rest/treasure/elite], combat, combat, boss
+function buildRoomSequence(floorNum){
+  const seq=[];
+  const combatCount=3+Math.min(floorNum,4); // 4-7 combat rooms
+  for(let i=0;i<combatCount;i++) seq.push('combat');
+  // Insert a rest or treasure room in the middle
+  const midPos=Math.floor(combatCount/2);
+  seq.splice(midPos,0,Math.random()<0.5?'rest':'treasure');
+  // Elite room on floor 2+
+  if(floorNum>=2) seq.splice(seq.length-1,0,'elite');
+  // Boss always last
+  seq.push('boss');
+  return seq;
+}
+
+// ── Global State ──────────────────────────────────
+let G={};
+function resetGame(){
+  G={running:false,paused:false,floor:1,roomIndex:0,roomSequence:[],roomCleared:false,
+    player:null,enemies:[],projectiles:[],particles:[],pickups:[],minions:[],
+    score:0,kills:0,lastTime:0,levelUpQueue:0,showingLevelUp:false,
+    shootTimer:0,dodgeCooldown:0,camera:{x:0,y:0},roomEnemyList:[]};
+}
+
+// ── Player (nerfed: 60 hp, slower, less dmg) ──────
+function createPlayer(){
+  return{
+    x:400,y:300,size:18,
+    hp:60,maxHp:60,
+    speed:2.6,
+    level:1,xp:0,xpNext:30,
+    armor:0,dmgMult:0.7,fireMult:1,
+    regen:0,regenTimer:0,
+    crit:0.04,lifesteal:0,
+    ammoMult:1,projSpeedMult:1,
+    extraBullets:0,pickupRadius:40,
+    maxDodge:2,dodges:2,
+    explodeKill:false,healOnKill:0,xpMult:1,
+    rolling:false,rollVx:0,rollVy:0,rollTimer:0,
+    weapons:[Object.assign({},WEAPONS[0],{ammo:Infinity})],
+    activeWeapon:0,reloading:false,reloadTimer:0,
+    mutations:[],iframes:0,vx:0,vy:0,
+  };
+}
+
+function unlockWeapon(idx){
+  const P=G.player; if(!P) return;
+  if(P.weapons.find(w=>w.name===WEAPONS[idx].name)) return;
+  if(P.weapons.length>=4){
+    // replace oldest non-pistol slot
+    const ri=P.weapons.findIndex(w=>w.name!=='Scrap Pistol');
+    if(ri!==-1) P.weapons.splice(ri,1);
+    else return;
+  }
+  const w=Object.assign({},WEAPONS[idx]); w.ammo=w.maxAmmo;
+  P.weapons.push(w);
+  log(`Equipped: ${w.name}!`,true);
+  updateWeaponBar();
+}
+
+// ── Minion ────────────────────────────────────────
+// Fires one bullet at a time on its own timer, follows player at offset
+function spawnMinion(){
+  G.minions.push({
+    x:G.player.x-60,y:G.player.y,
+    targetX:0,targetY:0,
+    hp:40,maxHp:40,size:14,
+    shootTimer:0,shootInterval:1800, // shoots every 1.8s (one bullet)
+    color:'#00ccff',dead:false,
+  });
+  log('Scrap Minion deployed!',true);
+}
+
+function updateMinions(dt){
+  const P=G.player;
+  G.minions=G.minions.filter(m=>!m.dead&&m.hp>0);
+  G.minions.forEach((m,mi)=>{
+    // Follow player with offset
+    const offsetAngle=(mi+1)*2.4+Date.now()*0.0005;
+    const followDist=70;
+    const tx=P.x+Math.cos(offsetAngle)*followDist;
+    const ty=P.y+Math.sin(offsetAngle)*followDist;
+    m.x+=(tx-m.x)*0.08;
+    m.y+=(ty-m.y)*0.08;
+
+    // Find nearest enemy, fire ONE bullet on interval
+    m.shootTimer+=dt;
+    if(m.shootTimer>=m.shootInterval){
+      m.shootTimer=0;
+      // Find nearest enemy
+      let nearest=null,bestDist=Infinity;
+      G.enemies.forEach(e=>{
+        if(e.hp<=0) return;
+        const d=Math.hypot(e.x-m.x,e.y-m.y);
+        if(d<bestDist&&d<350){bestDist=d;nearest=e;}
+      });
+      if(nearest){
+        const angle=Math.atan2(nearest.y-m.y,nearest.x-m.x);
+        G.projectiles.push({
+          x:m.x,y:m.y,
+          vx:Math.cos(angle)*9,vy:Math.sin(angle)*9,
+          dmg:5,color:'#00ccff',owner:'minion',
+          size:4,life:70,explosive:false,
+        });
+      }
+    }
+  });
+}
+
+// ── Room Generation ───────────────────────────────
+function generateFloor(floorNum){
+  return buildRoomSequence(floorNum).map((type,i)=>({
+    type,index:i,cleared:(type==='rest'||type==='treasure'),
+    visited:i===0,generated:false,enemies:[],items:[],
+  }));
+}
+
+function currentRoom(){ return G.roomSequence[G.roomIndex]; }
+const TOTAL_ROOMS=()=>G.roomSequence.length;
+
+function enterRoom(idx){
+  G.roomIndex=idx;
+  const room=G.roomSequence[idx];
+  room.visited=true;
+  G.roomCleared=room.cleared;
+  G.enemies=[];G.projectiles=[];G.particles=[];G.pickups=[];
+
+  G.player.x=canvas.width/2; G.player.y=canvas.height/2;
+
+  if(!room.generated){
+    room.generated=true;
+    if(room.type==='combat'||room.type==='elite'||room.type==='boss'){
+      spawnEnemiesForRoom(room);
+    } else if(room.type==='rest'){
+      spawnPickup(canvas.width/2,canvas.height/2,'medkit');
+      if(Math.random()<0.5) spawnPickup(canvas.width/2+80,canvas.height/2,'ammo');
+      room.items=[...G.pickups];
+    } else if(room.type==='treasure'){
+      spawnPickup(canvas.width/2,canvas.height/2,'chest');
+      room.items=[...G.pickups];
+    }
+  } else {
+    G.enemies=room.enemies.filter(e=>e.hp>0);
+    G.pickups=[...room.items];
+    G.roomCleared=room.cleared;
+  }
+
+  flashRoomLabel(room.type);
+  updateHUD();
+  updateRoomProgress();
+  drawMinimap();
+}
+
+function spawnEnemiesForRoom(room){
+  const fl=G.floor;
+  const isBoss=room.type==='boss';
+  const isElite=room.type==='elite';
+
+  // Scale HP/dmg/speed with floor
+  const hpScale=1+(fl-1)*0.35;
+  const dmgScale=1+(fl-1)*0.25;
+  const spdScale=1+(fl-1)*0.08;
+
+  const bossPool=ENEMY_TYPES.filter(e=>e.boss);
+  const normalPool=ENEMY_TYPES.filter(e=>!e.boss);
+
+  let count;
+  if(isBoss) count=1;
+  else if(isElite) count=2+Math.floor(fl*0.5);
+  else count=4+Math.floor(fl*0.8);
+
+  for(let i=0;i<count;i++){
+    let type;
+    if(isBoss){
+      // Cycle through bosses, then repeat harder ones
+      const bossIdx=Math.min((fl-1)%bossPool.length+Math.floor((fl-1)/bossPool.length),bossPool.length-1);
+      type=bossPool[bossIdx];
+    } else if(isElite){
+      const elitePool=normalPool.filter(e=>e.hp>60);
+      type=elitePool[Math.floor(Math.random()*Math.min(fl+1,elitePool.length))];
+    } else {
+      const avail=normalPool.slice(0,Math.min(3+fl,normalPool.length));
+      type=avail[Math.floor(Math.random()*avail.length)];
+    }
+
+    const angle=Math.random()*Math.PI*2;
+    const ddist=220+Math.random()*180;
+    const cx=canvas.width/2,cy=canvas.height/2;
+    const e={
+      ...type,
+      hp:type.hp*hpScale,maxHp:type.hp*hpScale,
+      dmg:type.dmg*dmgScale,
+      spd:type.spd*spdScale,
+      x:cx+Math.cos(angle)*ddist,y:cy+Math.sin(angle)*ddist,
+      vx:0,vy:0,
+      shootTimer:800+Math.random()*1200,
+      stunTimer:0,knockVx:0,knockVy:0,flash:0,
+      id:Math.random(),
+    };
+    G.enemies.push(e);
+  }
+  room.enemies=[...G.enemies];
+}
+
+function spawnPickup(x,y,kind){ G.pickups.push({x,y,kind,size:16,bob:Math.random()*Math.PI*2}); }
+
+// ── Weapons ───────────────────────────────────────
+function fireWeapon(){
+  const P=G.player;
+  const w=P.weapons[P.activeWeapon];
+  if(!w||P.reloading) return;
+  if(w.ammo!==Infinity&&w.ammo<=0){reload();return;}
+  const now=performance.now();
+  if(now-G.shootTimer<w.spd*P.fireMult) return;
+  G.shootTimer=now;
+
+  const dx=mouse.x-canvas.width/2, dy=mouse.y-canvas.height/2;
+  const baseAngle=Math.atan2(dy,dx);
+  const total=w.bullets+P.extraBullets;
+  for(let b=0;b<total;b++){
+    const angle=baseAngle+(Math.random()-0.5)*w.spread*2;
+    const spd=w.projSpd*P.projSpeedMult;
+    G.projectiles.push({
+      x:P.x,y:P.y,
+      vx:Math.cos(angle)*spd,vy:Math.sin(angle)*spd,
+      dmg:w.dmg*P.dmgMult,color:w.color,owner:'player',
+      size:w.name==='Nuke Flask'?10:4,
+      explosive:w.name==='Nuke Flask',
+      piercing:w.name==='Laser Pointer',
+      life:75,
+    });
+  }
+  if(w.ammo!==Infinity) w.ammo--;
+  updateWeaponBar();
+}
+
+function reload(){
+  const P=G.player;
+  const w=P.weapons[P.activeWeapon];
+  if(!w||P.reloading||w.ammo===Infinity) return;
+  P.reloading=true; P.reloadTimer=w.reload;
+  log(`Reloading ${w.name}…`);
+}
+
+function switchWeapon(idx){
+  const P=G.player;
+  if(idx<P.weapons.length){
+    P.activeWeapon=idx; P.reloading=false; P.reloadTimer=0;
+    updateWeaponBar();
+  }
+}
+
+function dodgeRoll(){
+  const P=G.player;
+  if(P.dodges<=0||P.rolling||G.dodgeCooldown>0) return;
+  const mx=(keys['KeyD']||keys['ArrowRight']?1:0)-(keys['KeyA']||keys['ArrowLeft']?1:0);
+  const my=(keys['KeyS']||keys['ArrowDown']?1:0)-(keys['KeyW']||keys['ArrowUp']?1:0);
+  const len=Math.hypot(mx,my)||1;
+  P.rolling=true; P.rollVx=(mx/len)*7; P.rollVy=(my/len)*7;
+  P.rollTimer=260; P.iframes=380; P.dodges--;
+  G.dodgeCooldown=900;
+  spawnParticleBurst(P.x,P.y,'#00ff88',8);
+}
+
+// ── XP/Level ─────────────────────────────────────
+function gainXP(amt){
+  const P=G.player;
+  P.xp+=amt*P.xpMult;
+  while(P.xp>=P.xpNext){
+    P.xp-=P.xpNext; P.level++;
+    P.xpNext=Math.floor(P.xpNext*1.5);
+    G.levelUpQueue++;
+    log(`LEVEL UP → ${P.level}!`,true);
+  }
+  updateHUD();
+}
+
+function showLevelUp(){
+  if(G.showingLevelUp) return;
+  G.showingLevelUp=true; G.paused=true;
+  const chosen=shuffle([...ALL_PERKS]).slice(0,3);
+  const grid=document.getElementById('perkGrid');
+  grid.innerHTML='';
+  chosen.forEach(perk=>{
+    const card=document.createElement('div');
+    card.className='perkCard';
+    card.innerHTML=`<span class="picon">${perk.icon}</span><div class="pname">${perk.name}</div><div class="pdesc">${perk.desc}</div>`;
+    card.onclick=()=>pickPerk(perk);
+    grid.appendChild(card);
+  });
+  document.getElementById('levelUpOverlay').style.display='flex';
+}
+
+function pickPerk(perk){
+  perk.apply(G.player);
+  G.player.mutations.push(perk);
+  document.getElementById('levelUpOverlay').style.display='none';
+  G.showingLevelUp=false; G.paused=false; G.levelUpQueue--;
+  updateMutPanel();
+  if(G.levelUpQueue>0) setTimeout(showLevelUp,300);
+}
+
+function updateMutPanel(){
+  const panel=document.getElementById('mutPanel');
+  panel.innerHTML='';
+  G.player.mutations.slice(-8).forEach(m=>{
+    const div=document.createElement('div');
+    div.className='mut glow';
+    div.innerHTML=`${m.icon}<span class="mtip">${m.name}</span>`;
+    panel.appendChild(div);
+  });
+}
+
+// ── Enemy AI ──────────────────────────────────────
+function updateEnemies(dt){
+  const P=G.player;
+  G.enemies.forEach(e=>{
+    if(e.hp<=0) return;
+    e.flash=Math.max(0,e.flash-dt);
+    e.stunTimer=Math.max(0,e.stunTimer-dt);
+
+    const dx=P.x-e.x, dy=P.y-e.y;
+    const dist=Math.hypot(dx,dy)||1;
+
+    if(e.stunTimer<=0){
+      // Sniper: keep distance
+      if(e.sniper && dist<200){
+        e.vx=-(dx/dist)*e.spd+e.knockVx;
+        e.vy=-(dy/dist)*e.spd+e.knockVy;
+      } else {
+        e.vx=(dx/dist)*e.spd+e.knockVx;
+        e.vy=(dy/dist)*e.spd+e.knockVy;
+      }
+      e.knockVx*=0.82; e.knockVy*=0.82;
+    } else {
+      e.vx=e.knockVx; e.vy=e.knockVy;
+      e.knockVx*=0.75; e.knockVy*=0.75;
+    }
+    e.x+=e.vx; e.y+=e.vy;
+
+    // Shooting enemies
+    if(e.shoots){
+      e.shootTimer-=dt;
+      if(e.shootTimer<=0){
+        if(e.burstShoot){
+          // Burst: 3 shots in quick succession
+          for(let bi=0;bi<3;bi++){
+            setTimeout(()=>{
+              if(!e||e.hp<=0) return;
+              const angle=Math.atan2(P.y-e.y,P.x-e.x)+(Math.random()-0.5)*0.35;
+              G.projectiles.push({x:e.x,y:e.y,vx:Math.cos(angle)*5.5,vy:Math.sin(angle)*5.5,dmg:e.dmg*0.45,color:'#ff4444',owner:'enemy',size:6,life:110,explosive:false});
+            },bi*120);
+          }
+          e.shootTimer=2200;
+        } else if(e.sniper){
+          const angle=Math.atan2(P.y-e.y,P.x-e.x)+(Math.random()-0.5)*0.08;
+          G.projectiles.push({x:e.x,y:e.y,vx:Math.cos(angle)*10,vy:Math.sin(angle)*10,dmg:e.dmg*0.8,color:'#ff0000',owner:'enemy',size:5,life:130,explosive:false});
+          e.shootTimer=2800;
+        } else {
+          const angle=Math.atan2(P.y-e.y,P.x-e.x)+(Math.random()-0.5)*0.25;
+          G.projectiles.push({x:e.x,y:e.y,vx:Math.cos(angle)*5,vy:Math.sin(angle)*5,dmg:e.dmg*0.4,color:'#ff4444',owner:'enemy',size:5,life:100,explosive:false});
+          e.shootTimer=e.boss?1200:1800;
+        }
+      }
+    }
+
+    // Melee
+    if(dist<e.size+P.size&&P.iframes<=0){
+      hitPlayer(e.dmg*(dt/900));
+    }
+  });
+  G.enemies=G.enemies.filter(e=>e.hp>0);
+}
+
+function hitPlayer(dmg){
+  const P=G.player;
+  const reduced=Math.max(1,dmg-P.armor*0.15);
+  P.hp-=reduced; P.iframes=450;
+  spawnDmgNum(P.x,P.y-20,`-${Math.round(reduced)}`);
+  spawnParticleBurst(P.x,P.y,'#ff4444',6);
+  updateHUD();
+  if(P.hp<=0) gameOver();
+}
+
+function killEnemy(e){
+  const P=G.player;
+  G.kills++; G.score+=e.score;
+  gainXP(e.xp);
+  if(P.healOnKill>0){ P.hp=Math.min(P.maxHp,P.hp+P.healOnKill); spawnDmgNum(e.x,e.y-30,`+${P.healOnKill}`,true); }
+  if(P.lifesteal>0){ const h=Math.ceil(e.maxHp*0.01*P.lifesteal*100); P.hp=Math.min(P.maxHp,P.hp+h); }
+  if(P.explodeKill) explode(e.x,e.y,55,15);
+  // XP orbs
+  for(let i=0;i<2+Math.floor(e.xp/20);i++){
+    G.pickups.push({x:e.x+(Math.random()-0.5)*50,y:e.y+(Math.random()-0.5)*50,kind:'xp_orb',xpAmt:Math.ceil(e.xp/3),size:10,bob:Math.random()*Math.PI*2});
+  }
+  if(Math.random()<0.18) G.pickups.push({x:e.x,y:e.y,kind:'ammo',size:14,bob:0});
+  if(Math.random()<0.06) G.pickups.push({x:e.x,y:e.y,kind:'medkit',size:14,bob:0});
+  spawnParticleBurst(e.x,e.y,e.color,14);
+  log(`${e.icon||'💀'} ${e.name} down`);
+  updateHUD();
+}
+
+function explode(x,y,radius,dmg){
+  spawnParticleBurst(x,y,'#ff8800',20);
+  G.enemies.forEach(e=>{
+    const d=Math.hypot(e.x-x,e.y-y);
+    if(d<radius){ const dealt=dmg*(1-d/radius); e.hp-=dealt; e.knockVx+=(e.x-x)/d*4; e.knockVy+=(e.y-y)/d*4; }
+  });
+}
+
+// ── Projectiles ───────────────────────────────────
+function updateProjectiles(dt){
+  const P=G.player;
+  G.projectiles=G.projectiles.filter(pr=>{
+    pr.x+=pr.vx; pr.y+=pr.vy; pr.life--;
+    if(pr.life<=0){ if(pr.explosive) explode(pr.x,pr.y,75,pr.dmg); return false; }
+
+    if(pr.owner==='player'||pr.owner==='minion'){
+      let hit=false;
+      G.enemies.forEach(e=>{
+        if((hit&&!pr.piercing)||e.hp<=0) return;
+        if(Math.hypot(pr.x-e.x,pr.y-e.y)<e.size+pr.size){
+          const isCrit=Math.random()<P.crit;
+          const dmg=isCrit?pr.dmg*2:pr.dmg;
+          e.hp-=dmg; e.flash=120;
+          e.knockVx+=pr.vx*0.25; e.knockVy+=pr.vy*0.25;
+          spawnDmgNum(e.x,e.y-20,Math.round(dmg).toString(),false,isCrit);
+          if(e.hp<=0) killEnemy(e);
+          hit=true;
+          if(pr.explosive){explode(pr.x,pr.y,75,pr.dmg);return;}
+        }
+      });
+      return pr.piercing?pr.life>0:!hit;
+    } else {
+      if(P.iframes<=0){
+        if(Math.hypot(pr.x-P.x,pr.y-P.y)<P.size+pr.size){
+          hitPlayer(pr.dmg); if(pr.explosive) explode(pr.x,pr.y,70,pr.dmg); return false;
+        }
+      }
+      return true;
+    }
+  });
+}
+
+// ── Particles ─────────────────────────────────────
+function spawnParticle(x,y,color,life=40){
+  G.particles.push({x,y,color,life,maxLife:life,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,size:2+Math.random()*3});
+}
+function spawnParticleBurst(x,y,color,count=12){
+  for(let i=0;i<count;i++) spawnParticle(x,y,color,25+Math.random()*35);
+}
+function updateParticles(){
+  G.particles=G.particles.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.vx*=0.91;p.vy*=0.91;p.life--;return p.life>0;});
+}
+
+function spawnDmgNum(x,y,text,heal=false,crit=false){
+  const el=document.createElement('div');
+  el.className='dmgNum'+(crit?' crit':'')+(heal?' heal':'');
+  el.textContent=text;
+  const sx=x-G.camera.x+canvas.width/2;
+  const sy=y-G.camera.y+canvas.height/2;
+  el.style.left=sx+'px'; el.style.top=sy+'px';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1000);
+}
+
+// ── Camera ────────────────────────────────────────
+function updateCamera(){
+  const P=G.player;
+  G.camera.x+=(P.x-G.camera.x)*0.1;
+  G.camera.y+=(P.y-G.camera.y)*0.1;
+}
+
+// ── Room Clear Check ──────────────────────────────
+function checkRoomCleared(){
+  const room=currentRoom();
+  if(room.cleared) return;
+  if(['combat','elite','boss'].includes(room.type)&&G.enemies.length===0){
+    room.cleared=true; G.roomCleared=true;
+    log('ROOM CLEARED! Press N for next room.',true);
+    spawnParticleBurst(G.player.x,G.player.y,'#ffff00',30);
+    flashRoomLabel('cleared');
+    if(room.type==='boss'){
+      // Heal on boss clear
+      G.player.hp=Math.min(G.player.maxHp,G.player.hp+G.player.maxHp*0.35);
+      log(`☢ FLOOR ${G.floor} COMPLETE! Healing 35% HP.`,true);
+      G.score+=G.floor*200;
+      updateHUD();
+      setTimeout(()=>{ G.floor++; startNewFloor(); },800);
+    }
+  }
+}
+
+function startNewFloor(){
+  G.roomSequence=generateFloor(G.floor);
+  G.roomIndex=0;
+  enterRoom(0);
+  log(`☢ FLOOR ${G.floor} — it only gets worse.`,true);
+}
+
+// ── Player Update ─────────────────────────────────
+function updatePlayer(dt){
+  const P=G.player;
+  P.iframes=Math.max(0,P.iframes-dt);
+  G.dodgeCooldown=Math.max(0,G.dodgeCooldown-dt);
+
+  // Dodge recharge
+  if(G.dodgeCooldown<=0) P.dodges=Math.min(P.maxDodge,P.dodges+(0.0008*dt));
+
+  if(P.reloading){
+    P.reloadTimer-=dt;
+    if(P.reloadTimer<=0){
+      const w=P.weapons[P.activeWeapon];
+      w.ammo=Math.round(w.maxAmmo*P.ammoMult);
+      P.reloading=false;
+      log(`${w.name} reloaded!`);
+      updateWeaponBar();
+    }
+  }
+
+  if(P.rolling){
+    P.rollTimer-=dt; P.x+=P.rollVx; P.y+=P.rollVy;
+    if(P.rollTimer<=0) P.rolling=false;
+    return;
+  }
+
+  let mx=0,my=0;
+  if(keys['KeyA']||keys['ArrowLeft'])  mx-=1;
+  if(keys['KeyD']||keys['ArrowRight']) mx+=1;
+  if(keys['KeyW']||keys['ArrowUp'])    my-=1;
+  if(keys['KeyS']||keys['ArrowDown'])  my+=1;
+  const len=Math.hypot(mx,my)||1;
+  if(mx||my){ P.x+=(mx/len)*P.speed*(dt/16); P.y+=(my/len)*P.speed*(dt/16); }
+
+  // Regen
+  P.regenTimer+=dt;
+  if(P.regen>0&&P.regenTimer>=1000){ P.regenTimer=0; P.hp=Math.min(P.maxHp,P.hp+P.regen); updateHUD(); }
+
+  // Shooting
+  const w=P.weapons[P.activeWeapon];
+  if(mouse.down&&!P.reloading){
+    if(w.auto) fireWeapon();
+    else if(shootHeld){ fireWeapon(); shootHeld=false; }
+  }
+
+  // Pickups
+  G.pickups=G.pickups.filter(pk=>{
+    pk.bob+=0.05;
+    const d=Math.hypot(pk.x-P.x,pk.y-P.y);
+    if(d<P.pickupRadius){ collectPickup(pk); return false; }
+    return true;
+  });
+}
+
+function collectPickup(pk){
+  const P=G.player;
+  if(pk.kind==='medkit'){
+    P.hp=Math.min(P.maxHp,P.hp+30);
+    spawnDmgNum(P.x,P.y-30,'+30',true);
+    log('Healed 30 HP',true);
+  } else if(pk.kind==='ammo'){
+    P.weapons.forEach(w=>{ if(w.maxAmmo!==Infinity) w.ammo=Math.min(Math.round(w.maxAmmo*P.ammoMult),w.maxAmmo); });
+    log('Ammo refilled!',true);
+  } else if(pk.kind==='chest'){
+    const available=WEAPONS.filter(w=>!P.weapons.find(pw=>pw.name===w.name));
+    if(available.length>0) unlockWeapon(WEAPONS.indexOf(available[Math.floor(Math.random()*available.length)]));
+    else { P.hp=Math.min(P.maxHp,P.hp+30); log('Already armed! +30HP',true); }
+  } else if(pk.kind==='xp_orb'){
+    gainXP(pk.xpAmt||4);
+  }
+  updateWeaponBar();
+}
+
+// ── Render ────────────────────────────────────────
+function render(){
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  // Background grid
+  const ox=(-G.camera.x%TILE+TILE)%TILE, oy=(-G.camera.y%TILE+TILE)%TILE;
+  ctx.fillStyle='#080c08'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#0d1a0d'; ctx.lineWidth=1;
+  for(let x=ox-TILE;x<W+TILE;x+=TILE){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=oy-TILE;y<H+TILE;y+=TILE){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  // Room boundary
+  const rW=860,rH=620;
+  const bx=W/2-rW/2,by=H/2-rH/2;
+  ctx.save();
+  const room=currentRoom();
+  ctx.strokeStyle=room?.cleared?'#39ff1444':'#ff444433';
+  ctx.lineWidth=3; ctx.shadowColor=room?.cleared?'#39ff14':'#ff4444'; ctx.shadowBlur=20;
+  ctx.strokeRect(bx,by,rW,rH);
+  ctx.restore();
+
+  const tx=-G.camera.x+W/2, ty=-G.camera.y+H/2;
+
+  // Particles
+  G.particles.forEach(p=>{ ctx.globalAlpha=p.life/p.maxLife; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x+tx,p.y+ty,p.size,0,Math.PI*2); ctx.fill(); });
+  ctx.globalAlpha=1;
+
+  // Pickups
+  const PINFO={medkit:{icon:'❤',color:'#ff4444'},ammo:{icon:'📦',color:'#ffff00'},chest:{icon:'🎁',color:'#ffaa00'},xp_orb:{icon:'⭐',color:'#00ff88'}};
+  G.pickups.forEach(pk=>{
+    const info=PINFO[pk.kind]||{icon:'?',color:'#fff'};
+    const py2=pk.y+Math.sin(pk.bob)*4;
+    ctx.save(); ctx.font=`${pk.size*1.5}px VT323`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor=info.color; ctx.shadowBlur=12; ctx.fillStyle=info.color;
+    ctx.fillText(info.icon,pk.x+tx,py2+ty); ctx.restore();
+  });
+
+  // Projectiles
+  G.projectiles.forEach(pr=>{
+    ctx.save(); ctx.fillStyle=pr.color; ctx.shadowColor=pr.color; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.arc(pr.x+tx,pr.y+ty,pr.size,0,Math.PI*2); ctx.fill(); ctx.restore();
+  });
+
+  // Enemies
+  G.enemies.forEach(e=>{
+    if(e.hp<=0) return;
+    const ex=e.x+tx,ey=e.y+ty;
+    ctx.save();
+    if(e.flash>0) ctx.fillStyle='#ffffff';
+    else ctx.fillStyle=e.color;
+    ctx.shadowColor=e.color; ctx.shadowBlur=e.boss?22:10;
+    ctx.beginPath(); ctx.arc(ex,ey,e.size,0,Math.PI*2); ctx.fill();
+    if(e.icon){ ctx.font=`${e.size*1.1}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(e.icon,ex,ey); }
+    ctx.restore();
+    // HP bar
+    const bw=e.size*2.4,bh=4,pct=e.hp/e.maxHp;
+    ctx.fillStyle='#111'; ctx.fillRect(ex-bw/2,ey-e.size-10,bw,bh);
+    ctx.fillStyle=pct>0.5?'#39ff14':pct>0.25?'#ff8800':'#ff2222'; ctx.fillRect(ex-bw/2,ey-e.size-10,bw*pct,bh);
+    if(e.boss){
+      ctx.fillStyle='#ff4444'; ctx.font='11px VT323'; ctx.textAlign='center';
+      ctx.fillText(e.name,ex,ey-e.size-15);
+    }
+  });
+
+  // Minions
+  G.minions.forEach(m=>{
+    const mx2=m.x+tx,my2=m.y+ty;
+    ctx.save(); ctx.fillStyle='#00ccff'; ctx.shadowColor='#00ccff'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(mx2,my2,m.size,0,Math.PI*2); ctx.fill();
+    ctx.font=`${m.size}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('🤖',mx2,my2); ctx.restore();
+    // HP bar
+    const bw2=m.size*2,bh2=3,pct2=m.hp/m.maxHp;
+    ctx.fillStyle='#111'; ctx.fillRect(mx2-bw2/2,my2-m.size-8,bw2,bh2);
+    ctx.fillStyle='#00ccff'; ctx.fillRect(mx2-bw2/2,my2-m.size-8,bw2*pct2,bh2);
+  });
+
+  // Player
+  const P=G.player;
+  const px=P.x+tx,py2=P.y+ty;
+  ctx.save();
+  ctx.shadowColor=P.iframes>0?'#ffffff':'#39ff14'; ctx.shadowBlur=P.iframes>0?30:16;
+  ctx.globalAlpha=P.iframes>0&&Math.floor(P.iframes/55)%2===0?0.4:1;
+  ctx.fillStyle='#39ff14'; ctx.beginPath(); ctx.arc(px,py2,P.size,0,Math.PI*2); ctx.fill();
+  const aimAngle=Math.atan2(mouse.y-py2,mouse.x-px);
+  ctx.strokeStyle='#aaff00'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(px,py2); ctx.lineTo(px+Math.cos(aimAngle)*(P.size+14),py2+Math.sin(aimAngle)*(P.size+14)); ctx.stroke();
+  ctx.font=`${P.size*1.1}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('🧍',px,py2); ctx.restore();
+
+  // Reload bar
+  if(P.reloading){
+    const w=P.weapons[P.activeWeapon];
+    const pct=1-P.reloadTimer/w.reload;
+    ctx.fillStyle='#0a1a0a'; ctx.fillRect(px-30,py2-P.size-18,60,6);
+    ctx.fillStyle='#ffff00'; ctx.fillRect(px-30,py2-P.size-18,60*pct,6);
+  }
+
+  // Dodge pips
+  for(let i=0;i<P.maxDodge;i++){
+    ctx.fillStyle=i<Math.floor(P.dodges)?'#00ff88':'#1a3322';
+    ctx.beginPath(); ctx.arc(px-((P.maxDodge-1)*7/2)+i*7,py2+P.size+8,4,0,Math.PI*2); ctx.fill();
+  }
+
+  // "Next room" hint
+  if(G.roomCleared&&G.roomIndex<G.roomSequence.length-1){
+    ctx.save(); ctx.fillStyle='#ffff0088'; ctx.font='22px VT323';
+    ctx.textAlign='center'; ctx.shadowColor='#ffff00'; ctx.shadowBlur=14;
+    ctx.fillText('▶ [N] NEXT ROOM ▶',W/2,H/2+330); ctx.restore();
+  }
+
+  updateHUD();
+}
+
+// ── Minimap ───────────────────────────────────────
+function drawMinimap(){
+  const mc=document.getElementById('minimapCanvas');
+  const mctx=mc.getContext('2d');
+  mctx.clearRect(0,0,120,120);
+  const rooms=G.roomSequence;
+  const cw=Math.floor(110/rooms.length), ch=24, offX=5,offY=48;
+  rooms.forEach((r,i)=>{
+    const rx=offX+i*cw,ry=offY;
+    const col=r.type==='boss'?'#ff4444':r.type==='rest'?'#00ff88':r.type==='treasure'?'#ff8800':r.type==='elite'?'#ff44ff':'#1a4a1a';
+    mctx.fillStyle=i===G.roomIndex?'#39ff14':r.visited?col:'#0a1a0a';
+    mctx.strokeStyle=i===G.roomIndex?'#ffffff':'#0a2a0a';
+    mctx.lineWidth=1;
+    mctx.fillRect(rx,ry,cw-2,ch-2);
+    mctx.strokeRect(rx,ry,cw-2,ch-2);
+    if(r.cleared){mctx.fillStyle='#39ff14';mctx.font='9px VT323';mctx.textAlign='center';mctx.fillText('✓',rx+cw/2-1,ry+ch/2+3);}
+    if(r.type==='boss'){mctx.fillStyle='#ff4444';mctx.font='9px VT323';mctx.textAlign='center';mctx.fillText('☠',rx+cw/2-1,ry+ch/2+3);}
+  });
+  // Labels
+  mctx.fillStyle='#4a7a4a'; mctx.font='10px VT323'; mctx.textAlign='center';
+  mctx.fillText(`FLOOR ${G.floor}`,60,14);
+  mctx.fillText(`${G.roomIndex+1}/${rooms.length} ROOMS`,60,28);
+}
+
+function updateRoomProgress(){
+  const el=document.getElementById('roomProgress');
+  const rooms=G.roomSequence;
+  let s='';
+  rooms.forEach((r,i)=>{
+    const icons={boss:'☠',rest:'❤',treasure:'📦',elite:'⚡',combat:'⚔'};
+    const ic=icons[r.type]||'?';
+    if(i===G.roomIndex) s+=`[${ic}]`;
+    else if(r.cleared) s+=` ✓ `;
+    else if(r.visited) s+=` ${ic} `;
+    else s+=' · ';
+    if(i<rooms.length-1) s+='—';
+  });
+  el.textContent=s;
+}
+
+// ── HUD ───────────────────────────────────────────
+function updateHUD(){
+  if(!G.player) return;
+  const P=G.player;
+  document.getElementById('hudHp').textContent=`${Math.ceil(P.hp)}/${P.maxHp}`;
+  document.getElementById('hpFill').style.width=`${(P.hp/P.maxHp)*100}%`;
+  document.getElementById('hudLvl').textContent=P.level;
+  document.getElementById('xpFill').style.width=`${(P.xp/P.xpNext)*100}%`;
+  document.getElementById('hudFloor').textContent=G.floor;
+  document.getElementById('hudRoom').textContent=G.roomIndex+1;
+  document.getElementById('hudKills').textContent=G.kills;
+  document.getElementById('hudScore').textContent=G.score;
+}
+
+function updateWeaponBar(){
+  if(!G.player) return;
+  const P=G.player;
+  for(let i=0;i<4;i++){
+    const w=P.weapons[i];
+    document.getElementById('ws'+i).className='wslot'+(i===P.activeWeapon?' active':'');
+    document.getElementById('wi'+i).textContent=w?w.icon:'—';
+    document.getElementById('wa'+i).textContent=w?(w.ammo===Infinity?'∞':w.ammo):'';
+  }
+}
+
+function log(msg,imp=false){
+  const el=document.getElementById('log');
+  const line=document.createElement('div');
+  line.className='logLine'+(imp?' imp':'');
+  line.textContent=msg; el.appendChild(line);
+  setTimeout(()=>line.remove(),4000);
+  while(el.children.length>6) el.removeChild(el.firstChild);
+}
+
+function flashRoomLabel(type){
+  const labels={boss:'⚠ BOSS ROOM',elite:'⚡ ELITE CHAMBER',rest:'❤ REST AREA',treasure:'📦 SUPPLY CACHE',combat:'⚔ COMBAT ZONE',cleared:'✓ CLEARED — PRESS N'};
+  const el=document.getElementById('roomLabel');
+  el.textContent=labels[type]||type.toUpperCase();
+  el.style.opacity='1';
+  setTimeout(()=>el.style.opacity='0',2500);
+}
+
+// ── Room advance ──────────────────────────────────
+function advanceRoom(){
+  const next=G.roomIndex+1;
+  if(next<G.roomSequence.length){ enterRoom(next); drawMinimap(); }
+}
+
+// ── Game Over ─────────────────────────────────────
+function gameOver(){
+  G.running=false;
+  saveHS(G.score);
+  const deaths=['Consumed by radiation','Mutant food','Left to rot','Vaporized'];
+  document.getElementById('goSubtitle').textContent=deaths[Math.floor(Math.random()*deaths.length)];
+  document.getElementById('goStats').textContent=
+    `Floor ${G.floor} · Room ${G.roomIndex+1} · ${G.kills} kills · Score ${G.score} · Level ${G.player.level} · Best: ${getHS()}`;
+  document.getElementById('gameOverOverlay').style.display='flex';
+}
+
+function showStart(){
+  document.getElementById('gameOverOverlay').style.display='none';
+  document.getElementById('startOverlay').style.display='flex';
+}
+
+// ── Start ─────────────────────────────────────────
+function startGame(){
+  document.getElementById('startOverlay').style.display='none';
+  document.getElementById('gameOverOverlay').style.display='none';
+  document.getElementById('levelUpOverlay').style.display='none';
+  resetGame();
+  G.player=createPlayer();
+  G.roomSequence=generateFloor(1);
+  G.running=true; G.paused=false;
+  G.camera.x=G.player.x; G.camera.y=G.player.y;
+  enterRoom(0);
+  updateWeaponBar(); updateMutPanel(); updateHUD();
+  log('☢ Nuclear Wasteland — survive as long as you can.',true);
+  log('WASD=move, LMB=shoot, RMB=roll, N=next room');
+  requestAnimationFrame(gameLoop);
+}
+
+// ── Util ──────────────────────────────────────────
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; }
+
+// ── Main Loop ─────────────────────────────────────
+function gameLoop(ts){
+  if(!G.running) return;
+  requestAnimationFrame(gameLoop);
+  const dt=Math.min(ts-G.lastTime,50);
+  G.lastTime=ts;
+  if(G.paused){render();return;}
+  updatePlayer(dt);
+  updateEnemies(dt);
+  updateMinions(dt);
+  updateProjectiles(dt);
+  updateParticles();
+  updateCamera();
+  checkRoomCleared();
+  if(G.levelUpQueue>0&&!G.showingLevelUp) showLevelUp();
+  render();
+  drawMinimap();
+}
+</script>
+</body>
+</html>
